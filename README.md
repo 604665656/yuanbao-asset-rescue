@@ -19,9 +19,13 @@
 | `recover.py` | 扫描元宝 `Cache_Data` → 按 magic byte 识别图片 → sha1 去重 → 绿占比/尺寸粗分桶 → 输出 `_yb_stage/_index.json` |
 | `build_archive.py` | 读 `_index.json` → 分组编号 → 清单(CSV/JSON) → 缩略图 → 分组总览图 → 根目录 `index.html` 图廊 |
 | `triage.py` | 出逐格审查图（带编号），用于人工挑出「不属于本项目」的图 |
+| `merge_round.py` | **增量轮次合并**：新一轮缓存与已有清单做 sha1 差集，只并入真新增；补 `轮次` / `路径` 字段，重建清单与图廊。带 `--dry-run` |
+| `gallery.py` | **清单驱动**的图廊生成器：只读 `清单/图片清单.json` 的 `路径` / `归属` / `组`，不再依赖提取阶段的中间目录 |
 | `push.py` | 大仓库分批提交+推送（代理不稳时），每批推完比对 sha |
 
 依赖：`pip install pillow`。只跑工具不需要别的。
+
+首轮用 `build_archive.py` 全量建；**第二轮起改用 `merge_round.py` 增量并**，不要再全量重建 —— 缓存会被新对话挤掉，全量重建会把上一轮已经捞到的图弄丢。
 
 ---
 
@@ -46,6 +50,28 @@ python build_archive.py --title "我的素材档案"
 set GH_TOKEN=你的token
 python push.py --owner 你的名 --repo 仓库名 --desc "..."
 ```
+
+### 第二轮及以后（缓存换批了）
+
+```bash
+# 6) 重新提取到新目录，别覆盖上一轮的 stage
+python recover.py --out ./stage_round2
+
+# 7) 与已有清单做差集，只保留真新增（本工具自动做）
+#    出核对图时务必把「编号 + 缓存ID + 尺寸」画在同一格，见坑 9
+python triage.py --stage ./stage_round2
+
+# 8) 预演 -> 实跑。--ui-list 里的编号进「界面与过程记录」单独分组
+python merge_round.py --archive ./我的档案 --fresh ./stage_round2 \
+    --round "第2轮·八向新文件" --ui-list 2,3,8,10,11 --dry-run
+python merge_round.py --archive ./我的档案 --fresh ./stage_round2 \
+    --round "第2轮·八向新文件" --ui-list 2,3,8,10,11
+```
+
+真实案例：[`hashimiao-asset-archive`](https://github.com/604665656/hashimiao-asset-archive)
+第 1 轮 246 张，几小时后缓存从 526 条图片记录被新对话换成 254 条；
+第 2 轮重新提取 173 张唯一图、131 张与首轮重复，**42 张真新增 / 103.9 MB** 全部并入，
+清单从 314 条变成 356 条，7 批推送完成。
 
 ---
 
@@ -102,16 +128,40 @@ python push.py --owner 你的名 --repo 仓库名 --desc "..."
   必须走 `PUT /repos/{o}/{r}/topics`，body `{"names":[...]}`。
 - `PUT /topics` 是**覆盖**语义，会冲掉原有值。设置类接口一律先 GET 现值再并集。
 
+### 8. 缓存会被新对话**挤掉／换批**，一次全捞不等于永久留底
+
+首轮缓存里有 526 条图片记录、编号到 `f_00055x`；几小时后同一目录只剩 254 条、编号变成 `f_00060a`，
+旧的那批已经不在。
+
+**结论**：要「全部记录」就得**每轮及时提取并做差集**，别指望一次性捞完。
+清单里加 `轮次` 字段，第二轮起走 `merge_round.py` 增量合并，绝不重新全量构建。
+实测第二轮 173 张唯一图里 131 张与首轮重复，只有 42 张是真新增。
+
+### 9. 审查图的**编号必须和缓存ID画在同一格**，否则会误判
+
+踩过一次：按「34/35/36/38/40/41/42」从两张不同脚本生成的图里取可疑格，
+一套取出来是网页截图和印章，另一套取出来全是角色设定稿 —— 两套编号对应的根本不是同一个顺序，
+差点按错的编号写进 `EXCLUDE` 把好图剔掉。
+
+**修法**：核对图每一格直接写 `编号 + 缓存ID + 尺寸`，一次把整批铺开看全，不靠脚本外的顺序推断。
+
+### 10. Pages 状态有**中间态**，判断成功要看 commit
+
+推完立刻查 `GET /repos/{o}/{r}/pages` 可能还返回上一次的 `errored`，
+但 `pages/builds/latest` 已经是 `built`。要看最新构建的 `commit` 是不是刚推的 sha，
+别只盯 `status` 一个字段就以为又坏了。
+
 ---
 
 ## 经验复用清单（下次直接照做）
 
-1. 先 `recover.py` 全捞（缓存不去重前可能几百张，正常）。
+1. 先 `recover.py` 全捞（缓存不去重前可能几百张，正常），**输出目录按轮次分开**。
 2. 看 `recover.py` 输出的桶分布，判断有没有混入别的对话的图。
-3. `build_archive.py` 铺第一版 → `triage.py` 出审查图 → 目视填 `EXCLUDE` → 重跑。
-4. 推送前确认仓库根有 `.nojekyll`（要开 Pages 的话）。
-5. 推送用 `push.py`，别一次性推。
-6. 验证线上用 API 取 blob，别用 `curl`（代理截断）。
+3. `build_archive.py` 铺第一版 → `triage.py` 出审查图（带编号+缓存ID）→ 目视填 `EXCLUDE` → 重跑。
+4. **缓存换批后**：`recover.py --out stage_roundN` → `merge_round.py --dry-run` → 实跑；重复 sha1 自动跳过。
+5. 推送前确认仓库根有 `.nojekyll`（要开 Pages 的话）。
+6. 推送用 `push.py`，别一次性推。
+7. 验证线上用 API 取 blob + `pages/builds/latest` 的 commit，别用 `curl`（代理截断）。
 
 ---
 
