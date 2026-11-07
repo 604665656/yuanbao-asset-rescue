@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-"""给 yuanbao-cache-recover 建一个路线图看板（幂等）。
+"""给 yuanbao-asset-rescue 建一个路线图看板（幂等）。
 
-- ProjectV2「yuanbao-cache-recover · 路线图」，public
+- ProjectV2「yuanbao-asset-rescue · 路线图」，public
 - 优先级单选字段 P0/P1/P2
 - 几条关于工具迭代 / 经验沉淀的议题，关联本仓库并写入优先级
 """
@@ -12,7 +12,7 @@ import urllib.error
 
 TOKEN = os.environ['GH_TOKEN']
 OWNER = '604665656'
-REPO = 'yuanbao-cache-recover'
+REPO = 'yuanbao-asset-rescue'
 API = 'https://api.github.com'
 GQL = 'https://api.github.com/graphql'
 
@@ -69,6 +69,15 @@ def ensure_issues():
          '图廊支持按宽高、绿占比、桶筛选，便于在几百张里快速定位某类图。'),
         ('P1', 'push.py 断点续传',
          '代理断了能从失败的批继续，而不是从头推；加 --dry-run。'),
+        ('P1', 'EXCLUDE 外置为 exclude.json',
+         '剔除清单现在硬编码在 build_archive.py 里，换个项目就得改脚本。挪成独立的 '
+         'exclude.json（按桶 + 编号），triage 后直接编辑，脚本读文件；同时支持 --exclude 指定路径。'),
+        ('P2', '导出被去重的重复图清单',
+         'recover.py 现在把 sha1 重复项只标「重复」不落盘，无法审计。补一份 '
+         'duplicates.csv（原缓存ID → 保留的那张 / 重复张数），用于核对去重有没有误杀。'),
+        ('P2', '补一份本次哈士喵案例文档',
+         '把 526 原始 → 304 唯一 → 246 本项目 + 68 其他对话 的完整数字链、逐格分拣标准、'
+         '以及 7 个坑的现场证据写成 CASE.md，作为「以后怎么复用」的样例，而不只是抽象说明。'),
     ]
     created = []
     for pri, title, body in specs:
@@ -88,13 +97,13 @@ def ensure_project():
     d = gql('{user(login:"%s"){projectsV2(first:30){nodes{number title id public}}}}' % OWNER)
     nodes = d['data']['user']['projectsV2']['nodes']
     for p in nodes:
-        if p['title'] == 'yuanbao-cache-recover · 路线图':
+        if p['title'] == 'yuanbao-asset-rescue · 路线图':
             print('  看板已存在 #%d' % p['number'])
             return p['id'], p['number']
     pid = owner_id()
     r = gql('mutation($o:ID!,$t:String!){createProjectV2(input:'
             '{ownerId:$o,title:$t}){projectV2{id,number}}}',
-            {'o': pid, 't': 'yuanbao-cache-recover · 路线图'})
+            {'o': pid, 't': 'yuanbao-asset-rescue · 路线图'})
     pr = r['data']['createProjectV2']['projectV2']
     # 设为 public + 写简短说明（updateProjectV2 才接受 shortDescription）
     gql('mutation($p:ID!,$d:String!){updateProjectV2(input:{projectId:$p,public:true,'

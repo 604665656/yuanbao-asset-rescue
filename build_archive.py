@@ -212,6 +212,9 @@ footer{padding:26px;color:#6b7482;font-size:12px;border-top:1px solid #23272f}
         n = len([m for m in manifest if m['组'] == dirname and m['归属'] == '本项目'])
         if n:
             parts.append('<a href="#%s">%s（%d）</a>' % (dirname, dirname, n))
+    n_oth = len([m for m in manifest if m['归属'] != '本项目'])
+    if n_oth:
+        parts.append('<a href="#其他对话">其他对话（%d）</a>' % n_oth)
     parts.append('</nav><main>')
     for dirname, note in groups:
         items = [m for m in manifest if m['组'] == dirname and m['归属'] == '本项目']
@@ -229,10 +232,9 @@ footer{padding:26px;color:#6b7482;font-size:12px;border-top:1px solid #23272f}
         parts.append('</div></section>')
     oth = [m for m in manifest if m['归属'] != '本项目']
     if oth:
-        parts.append('<section id="其他对话"><h2>其他对话（已排除）</h2>'
+        parts.append('<section id="其他对话"><h2>其他对话 · 单独存档</h2>'
                      '<div class="hint">同一个元宝账号下别的对话的图片，混在缓存里被一起捞出来的。'
-                     '不算本项目素材，但保留存档不删。共 %d 张。</div>'
-                     '<details><summary style="cursor:pointer;color:#8b95a5;font-size:12.5px;margin-bottom:10px">展开</summary>'
+                     '不算本项目素材，但完整保留不删，默认展开供查。共 %d 张。</div>'
                      '<div class="grid">' % len(oth))
         for m in oth:
             rel = '其他对话/' + m['组'] + '/' + m['文件']
@@ -240,7 +242,7 @@ footer{padding:26px;color:#6b7482;font-size:12px;border-top:1px solid #23272f}
             parts.append('<div class="card"><a href="%s" target="_blank"><img loading="lazy" src="%s" alt="%s">'
                          '<div class="meta">%s %s</div></a></div>'
                          % (rel, thumb, m['文件'], m['文件'][:14], '%.0fKB' % (m['字节'] / 1024)))
-        parts.append('</div></details></section>')
+        parts.append('</div></section>')
     parts.append('''</main>
 <footer>缩略图在本页，点开是原图。完整字段见 <a href="清单/图片清单.csv" style="color:#5cc8ff">清单/图片清单.csv</a>。
 <br>来源：元宝 App（WebView2 缓存）导出。对话正文未缓存，无法恢复。</footer>

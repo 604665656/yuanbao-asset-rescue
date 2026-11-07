@@ -1,4 +1,4 @@
-# yuanbao-cache-recover
+# yuanbao-asset-rescue
 
 从**元宝 App** 的本地缓存里把对话中渲染过的图片全部抢救出来，整理成带清单和图廊的素材档案。
 
