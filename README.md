@@ -7,6 +7,9 @@
 
 本仓库是一套**通用工具 + 经验沉淀**，第一次是为了抢救「哈士喵（眼镜猫）」项目在元宝里十几轮对话的产出，之后任何元宝对话想留底都能复用。
 
+[![路线图](https://img.shields.io/badge/路线图-Project-5cc8ff)](https://github.com/users/604665656/projects/11)
+[![示例档案](https://img.shields.io/badge/示例-真实抢救成果-ffb454)](https://604665656.github.io/hashimiao-asset-archive/)
+
 ---
 
 ## 工具链
